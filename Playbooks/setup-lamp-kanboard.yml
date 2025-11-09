@@ -1,0 +1,68 @@
+---
+- name: Deploy LAMP and Kanboard
+  hosts: rge-test
+  become: true
+
+  vars:
+    kanboard_web_dir: /var/www/html/kanboard
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install LAMP stack
+      apt:
+        name:
+          - apache2
+          - mysql-server
+          - php
+          - php-mysql
+          - libapache2-mod-php
+          - unzip
+        state: present
+
+    - name: Enable Apache2
+      systemd:
+        name: apache2
+        enabled: yes
+        state: started
+
+    - name: Download Kanboard
+      get_url:
+        url: https://github.com/kanboard/kanboard/archive/refs/heads/master.zip
+        dest: /tmp/kanboard.zip
+
+    - name: Extract Kanboard
+      unarchive:
+        src: /tmp/kanboard.zip
+        dest: /var/www/html/
+        remote_src: yes
+
+    - name: Move Kanboard to correct directory
+      command: mv /var/www/html/kanboard-main /var/www/html/kanboard
+      args:
+        creates: "{{ kanboard_web_dir }}"
+
+    - name: Set permissions
+      file:
+        path: "{{ kanboard_web_dir }}"
+        owner: www-data
+        group: www-data
+        mode: '0755'
+        recurse: yes
+    - name: Install PHP extensions required by Kanboard
+      apt:
+        name:
+          - php-sqlite3
+          - php-gd
+          - php-mbstring
+          - php-xml
+        state: present
+      become: yes
+
+
+    - name: Restart Apache2
+      service:
+        name: apache2
+        state: restarted
